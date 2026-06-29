@@ -1,0 +1,14 @@
+{
+  "name": "p10-monorepo",
+  "version": "1.0.0",
+  "description": "P10 Demo — React + Express Monorepo · Web Advanced Development",
+  "private": true,
+  "scripts": {
+    "dev:be": "cd backend && npm run dev",
+    "dev:fe": "cd frontend && npm run dev",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:seed": "cd backend && node prisma/seed.js",
+    "db:studio": "cd backend && npx prisma studio"
+  }
+}
