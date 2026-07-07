@@ -5,12 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Proxy API calls ke backend — hindari CORS issue saat development
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

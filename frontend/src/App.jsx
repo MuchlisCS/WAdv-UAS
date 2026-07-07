@@ -1,150 +1,156 @@
-// frontend/src/App.jsx
-// Root component — semua state ada di sini, diturunkan ke child lewat props
-// Ini pola "lifting state up" yang fundamental di React
+import { useEffect, useState } from 'react';
+import Login from './components/Login.jsx';
+import PostForm from './components/PostForm.jsx';
+import PostList from './components/PostList.jsx';
 
-import { useState, useEffect } from 'react'
-import { getCategories, getProducts, createProduct, deleteProduct } from './api.js'
-
-import Navbar          from './components/Navbar.jsx'
-import CategoryFilter  from './components/CategoryFilter.jsx'
-import ProductCard     from './components/ProductCard.jsx'
-import AddProductForm  from './components/AddProductForm.jsx'
+const API_BASE = '/api';
 
 export default function App() {
-  // ── State ──────────────────────────────────────────────────
-  const [categories, setCategories]       = useState([])
-  const [products, setProducts]           = useState([])
-  const [activeCategoryId, setActiveCategoryId] = useState(null)
-  const [loading, setLoading]             = useState(true)
-  const [toast, setToast]                 = useState('')  // pesan sukses
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [commentsByPost, setCommentsByPost] = useState({});
 
-  // ── Load data saat pertama kali komponen di-mount ──────────
-  // useEffect dengan [] = jalankan sekali setelah render pertama
   useEffect(() => {
-    loadAll()
-  }, [])
+    loadPosts();
+  }, []);
 
-  async function loadAll() {
-    setLoading(true)
+  async function loadPosts() {
+    setLoading(true);
+    setError('');
+
     try {
-      const [catData, prodData] = await Promise.all([
-        getCategories(),
-        getProducts(),
-      ])
-      setCategories(catData)
-      setProducts(prodData)
+      const res = await fetch(`${API_BASE}/posts`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to load posts');
+      setPosts(data.posts || []);
     } catch (err) {
-      console.error('Gagal load data:', err.message)
+      setError(err.message || 'Failed to load posts');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  // ── Handler: tambah produk ─────────────────────────────────
-  async function handleAdd(data) {
-    const newProduct = await createProduct(data)
-    // Tambah ke state lokal tanpa fetch ulang (optimistic update)
-    setProducts(prev => [newProduct, ...prev])
-    showToast(`✓ "${newProduct.name}" berhasil ditambahkan!`)
+  async function handleLogin(credentials) {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
   }
 
-  // ── Handler: hapus produk ──────────────────────────────────
-  async function handleDelete(id, name) {
-    if (!window.confirm(`Hapus "${name}"?`)) return
-    await deleteProduct(id)
-    // Buang dari state lokal
-    setProducts(prev => prev.filter(p => p.id !== id))
-    showToast(`✓ "${name}" berhasil dihapus.`)
+  async function handleCreatePost({ title, content }) {
+    const res = await fetch(`${API_BASE}/posts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title, content }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Unable to create post');
+
+    await loadPosts();
   }
 
-  // ── Helper: tampilkan toast sebentar ───────────────────────
-  function showToast(message) {
-    setToast(message)
-    setTimeout(() => setToast(''), 3000)
+  async function loadComments(postId) {
+    const res = await fetch(`${API_BASE}/posts/${postId}/comments`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to load comments');
+
+    setCommentsByPost((prev) => ({ ...prev, [postId]: data.comments || [] }));
   }
 
-  // ── Filter produk berdasarkan kategori aktif ───────────────
-  const filteredProducts = activeCategoryId === null
-    ? products
-    : products.filter(p => p.categoryId === activeCategoryId)
+  async function handleAddComment(postId, content) {
+    const res = await fetch(`${API_BASE}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ postId, content }),
+    });
 
-  // ════════════════════════════════════════════════════════════
-  //  RENDER
-  // ════════════════════════════════════════════════════════════
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Unable to add comment');
+
+    await loadComments(postId);
+  }
+
   return (
-    <>
-      <Navbar />
+    <div style={containerStyle}>
+      <h1 style={{ marginBottom: '16px' }}>Gamers Forum</h1>
+      <p style={{ marginBottom: '20px', color: '#4b5563' }}>A simple private forum for your gaming community.</p>
 
-      <div className="container" style={{ marginTop: 28 }}>
-
-        {/* Toast notifikasi */}
-        {toast && (
-          <div className="card-panel teal lighten-5 teal-text text-darken-3"
-            style={{ padding: '10px 16px', marginBottom: 16 }}>
-            {toast}
-          </div>
-        )}
-
-        {/* Form tambah produk */}
-        <AddProductForm categories={categories} onAdd={handleAdd} />
-
-        <div style={{ marginTop: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h6 style={{ margin: 0, color: '#1565c0', fontWeight: 600 }}>
-              Produk
-              <span style={{ color: '#9e9e9e', fontWeight: 400, marginLeft: 8 }}>
-                ({filteredProducts.length})
-              </span>
-            </h6>
-            <button
-              className="btn-flat btn-small blue-text"
-              onClick={loadAll}
-              disabled={loading}
-            >
-              <i className="material-icons tiny" style={{ verticalAlign: 'middle', marginRight: 4 }}>refresh</i>
-              Refresh
-            </button>
-          </div>
-
-          {/* Filter kategori */}
-          <CategoryFilter
-            categories={categories}
-            activeId={activeCategoryId}
-            onSelect={setActiveCategoryId}
-          />
-
-          {/* Loading state */}
-          {loading && (
-            <div className="center-align" style={{ padding: 40 }}>
-              <div className="preloader-wrapper small active">
-                <div className="spinner-layer spinner-blue-only">
-                  <div className="circle-clipper left"><div className="circle"></div></div>
-                  <div className="gap-patch"><div className="circle"></div></div>
-                  <div className="circle-clipper right"><div className="circle"></div></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Product grid */}
-          {!loading && filteredProducts.length === 0 && (
-            <div className="center-align grey-text" style={{ padding: 40 }}>
-              <i className="material-icons large">inventory_2</i>
-              <p>Belum ada produk di kategori ini.</p>
-            </div>
-          )}
-
-          {!loading && (
-            <div className="row">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="col s12 m6 l4">
-                  <ProductCard product={product} onDelete={handleDelete} />
-                </div>
-              ))}
-            </div>
-          )}
+      {!token ? (
+        <Login onLogin={handleLogin} />
+      ) : (
+        <div style={{ marginBottom: '20px' }}>
+          <p>You are logged in.</p>
+          <button onClick={() => { localStorage.removeItem('token'); setToken(''); }} style={buttonStyle}>
+            Logout
+          </button>
         </div>
-      </div>
-    </>
-  )
+      )}
+
+      <PostForm onSubmit={handleCreatePost} token={token} />
+
+      <button onClick={loadPosts} style={secondaryButtonStyle}>
+        Refresh Posts
+      </button>
+
+      <PostList
+        posts={posts}
+        loading={loading}
+        error={error}
+        commentsByPost={commentsByPost}
+        token={token}
+        onLoadComments={loadComments}
+        onAddComment={handleAddComment}
+      />
+    </div>
+  );
 }
+
+const containerStyle = {
+  maxWidth: '800px',
+  margin: '0 auto',
+  padding: '24px',
+  fontFamily: 'Arial, sans-serif',
+};
+
+const buttonStyle = {
+  padding: '10px 14px',
+  border: 'none',
+  borderRadius: '8px',
+  background: '#dc2626',
+  color: '#fff',
+  cursor: 'pointer',
+  marginBottom: '12px',
+};
+
+const secondaryButtonStyle = {
+  padding: '8px 12px',
+  border: '1px solid #d1d5db',
+  borderRadius: '8px',
+  background: '#f9fafb',
+  cursor: 'pointer',
+  marginBottom: '12px',
+};
+
+const cardStyle = {
+  border: '1px solid #e5e7eb',
+  borderRadius: '10px',
+  padding: '16px',
+  marginBottom: '12px',
+  background: '#fff',
+};
