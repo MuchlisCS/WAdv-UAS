@@ -16,7 +16,7 @@ Aplikasi forum sederhana untuk komunitas gamer kecil.
 ### 🔧 Backend
 Masuk ke folder backend:
 bash
-
+```
 cd backend
 ```
 Install dependencies:
