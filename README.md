@@ -18,16 +18,16 @@ Masuk ke folder backend:
 ```bash
 cd backend
 
-Install dependencies:
+```Install dependencies:
 npm install
 
-Jalankan server:
+```Jalankan server:
 node index.js
 
-Server akan berjalan di:
+```Server akan berjalan di:
 http://localhost:3000
 
-🎨 Frontend
+```🎨 Frontend
 Masuk ke folder frontend:
 
 cd frontend
